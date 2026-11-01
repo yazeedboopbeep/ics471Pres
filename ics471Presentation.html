@@ -1,0 +1,1177 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>WiFi Pose Under Shift</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one fixed 1600x900 slide scaled to fit the window. Text column on the left; room plan and model panel top right; CSI plot along the bottom right. Drafting-sheet look: graphite ink on cool paper, ultramarine for the radio signal. */
+:root{
+  --paper:#F2F3F5;
+  --sheet:#FBFBFD;
+  --ink:#1B1E26;
+  --muted:#5D6474;
+  --rule:#D2D6DE;
+  --grid:#E3E6EC;
+  --signal:#2E47C2;
+  --good:#22764A;
+  --warn:#A3660E;
+  --bad:#B63628;
+  --grad:#B4690F;
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --body:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#121419; --sheet:#181B22; --ink:#E7E9EE; --muted:#959BA9; --rule:#2F343E; --grid:#20242C;
+    --signal:#93A6FF; --good:#5EC68E; --warn:#E3AF57; --bad:#F2826D; --grad:#E8B25C; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#121419; --sheet:#181B22; --ink:#E7E9EE; --muted:#959BA9; --rule:#2F343E; --grid:#20242C;
+  --signal:#93A6FF; --good:#5EC68E; --warn:#E3AF57; --bad:#F2826D; --grad:#E8B25C; color-scheme:dark;
+}
+html{box-sizing:border-box;height:100%}
+*,*::before,*::after{box-sizing:inherit}
+body{height:100%;margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);overflow:hidden;-webkit-font-smoothing:antialiased}
+.frame{height:100%;display:grid;place-items:center;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:16px}
+.wrap{position:relative;overflow:hidden}
+.stage{position:absolute;left:0;top:0;width:1600px;height:900px;transform-origin:0 0;background:var(--paper)}
+
+/* Left column */
+.left{position:absolute;left:64px;top:56px;width:480px;bottom:320px;display:flex;flex-direction:column}
+.left .copy{order:1}.left .steps{order:2}.left .callout{order:3}
+.eyebrow{font-family:var(--mono);font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0}
+.copy{transition:opacity .22s ease, transform .22s ease}
+.copy.swap{opacity:0;transform:translateY(6px)}
+h1{font-family:var(--display);font-stretch:118%;font-weight:720;font-size:60px;line-height:1.02;letter-spacing:-.012em;margin:26px 0 0;text-wrap:balance}
+.lede{font-size:20px;line-height:1.52;margin:24px 0 0;max-width:30em}
+.lede:empty{display:none}
+.lede abbr{text-decoration:none;font-weight:600}
+.callout{margin-top:20px;padding-top:14px;border-top:1px solid var(--rule);transition:opacity .4s ease .25s}
+.callout p{margin:0;font-size:15.5px;line-height:1.45;color:var(--muted)}
+.callout strong{display:block;margin-top:8px;font-family:var(--display);font-stretch:104%;font-weight:680;font-size:21px;line-height:1.2;color:var(--signal);white-space:nowrap}
+.steps{margin:30px 0 0;padding:0;list-style:none;display:grid}
+.steps button{display:grid;grid-template-columns:34px 1fr auto;align-items:baseline;width:100%;background:none;border:0;border-top:1px solid var(--rule);padding:13px 0;text-align:left;color:var(--muted);font:inherit;cursor:pointer}
+.steps li:last-child button{border-bottom:1px solid var(--rule)}
+.steps .n{font-family:var(--mono);font-size:13px}
+.steps .lbl{font-size:18px;font-weight:500}
+.steps .tag{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase}
+.steps button[aria-current="step"]{color:var(--ink)}
+.steps button[aria-current="step"] .n{color:var(--signal);font-weight:600}
+.steps button[aria-current="step"] .lbl{font-weight:600}
+.steps button:hover{color:var(--ink)}
+.steps button:focus-visible,.icon-btn:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+
+/* Panel headers */
+.ph{display:flex;justify-content:space-between;align-items:baseline;gap:16px;height:28px;font-family:var(--mono);font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.ph b{color:var(--ink);font-weight:600}
+.ph .note{text-transform:none;letter-spacing:0;font-size:13px}
+
+.plan{position:absolute;left:600px;top:56px;width:576px}
+.plan canvas{display:block;cursor:pointer}
+
+/* Model panel */
+.dash{position:absolute;left:1208px;top:84px;width:328px;height:496px;background:var(--sheet);border:1px solid var(--rule);border-radius:4px;padding:18px 20px;display:flex;flex-direction:column;gap:14px}
+.dash-top{display:flex;justify-content:space-between;align-items:center}
+.lbl-s{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.pill{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;padding:4px 9px;border-radius:999px;border:1px solid currentColor;background:color-mix(in srgb, currentColor 10%, transparent);white-space:nowrap}
+.good{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+.big{display:flex;align-items:baseline;gap:4px;font-family:var(--display);font-stretch:112%;font-weight:700;font-size:76px;line-height:.9;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.big small{font-size:30px;font-weight:600;color:var(--muted)}
+.meter{height:6px;border-radius:3px;background:var(--grid);overflow:hidden;margin-top:12px}
+.meter i{display:block;height:100%;border-radius:3px;background:currentColor;transition:background-color .3s}
+.row{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--rule);padding-top:12px}
+.row span:first-child{font-size:15px;color:var(--muted)}
+.row b{font-family:var(--mono);font-size:20px;font-weight:500;font-variant-numeric:tabular-nums}
+.legend{display:flex;gap:16px;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.sw-gt{background:var(--ink);opacity:.35}
+.sw-pr{background:var(--signal)}
+.sw-band{background:var(--signal);opacity:.25;height:10px!important}
+.sw-bad{background:var(--bad)}
+canvas{display:block}
+
+.csi{position:absolute;left:64px;top:612px;width:1472px}
+.readout{font-family:var(--mono);font-size:13px;text-transform:none;letter-spacing:0;color:var(--muted)}
+.readout b{font-variant-numeric:tabular-nums}
+
+.foot{position:absolute;left:64px;right:64px;bottom:22px;display:flex;justify-content:flex-end;gap:24px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.keys{display:flex;gap:18px;align-items:center}
+.keys kbd{font-family:var(--mono);font-size:11.5px;border:1px solid var(--rule);border-radius:3px;padding:1px 6px;margin-right:6px;color:var(--ink)}
+.icon-btn{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.icon-btn:hover{color:var(--ink)}
+
+/* Slides */
+.slide{position:absolute;inset:0;transition:opacity .6s ease, transform .6s ease, visibility 0s}
+.slide.off{opacity:0;transform:translateY(18px);visibility:hidden;pointer-events:none;transition:opacity .6s ease, transform .6s ease, visibility 0s linear .6s}
+
+/* Slide 2 */
+.s2-eyebrow{position:absolute;left:64px;top:56px}
+.heads{position:absolute;left:64px;top:96px;width:1472px;height:120px}
+.hd{position:absolute;left:0;top:0;width:100%;opacity:0;transform:translateY(8px);transition:opacity .35s ease, transform .35s ease}.s2[data-sub="0"] .h-intro,.s2[data-sub="1"] .h-intro,.s2[data-sub="2"] .h-train,.s2[data-sub="3"] .h-tta,.s2[data-sub="4"] .h-tta{opacity:1;transform:none;transition-delay:.25s}
+.statement{margin:0;max-width:1240px;font-family:var(--display);font-stretch:118%;font-weight:720;font-size:54px;line-height:1.05;letter-spacing:-.012em;text-wrap:balance}
+.hd .fix{margin:22px 0 0;max-width:none;font-family:var(--display);font-stretch:118%;font-weight:720;font-size:54px;line-height:1.05;color:var(--signal);opacity:0;transform:translateY(8px);transition:opacity .4s ease, transform .4s ease}
+.s2[data-sub="1"] .hd .fix{opacity:1;transform:none}
+.hd h2{margin:0;font-family:var(--display);font-stretch:116%;font-weight:700;font-size:42px;line-height:1.05;letter-spacing:-.01em}
+.hd p{margin:12px 0 0;font-size:19px;line-height:1.45;color:var(--muted);max-width:76ch}
+
+.tta-name{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;opacity:0;transform:scale(.97);transition:opacity .4s ease, transform .4s ease;pointer-events:none}
+.s2[data-sub="4"] .tta-name{opacity:1;transform:none;transition:opacity .6s ease .35s, transform .6s ease .35s}
+.tta-name .eb{font-family:var(--mono);font-size:14px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.tta-name h3{margin:0;font-family:var(--display);font-stretch:122%;font-weight:760;font-size:118px;line-height:1;letter-spacing:-.02em;color:var(--ink)}
+.tta-name .abbr{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:.3em;color:var(--signal);padding:6px 14px 6px 18px;border:1.5px solid var(--signal);border-radius:4px}
+
+.scene{position:absolute;left:0;top:0;transition:opacity .45s ease}.s2[data-sub="2"] .scene,.s2[data-sub="3"] .scene,.s2[data-sub="4"] .scene{opacity:0}
+.ring{fill:none;stroke:var(--signal);stroke-width:1.6;vector-effect:non-scaling-stroke;opacity:0;animation:ring 3.2s linear infinite}
+.r2{animation-delay:-.8s}.r3{animation-delay:-1.6s}.r4{animation-delay:-2.4s}
+@keyframes ring{0%{transform:scale(30);opacity:.75}100%{transform:scale(250);opacity:0}}
+.ant{stroke:var(--ink);stroke-width:3;stroke-linecap:round}
+.ant-tip{fill:var(--ink)}
+.tbl{fill:var(--ink)}
+.floor{stroke:var(--rule);stroke-width:1.5}
+
+.device{position:absolute;left:690px;top:640px;width:220px;height:90px;border:2px solid var(--ink);border-radius:6px;background:var(--sheet);overflow:hidden;
+  transition:left .9s cubic-bezier(.65,0,.35,1), top .9s cubic-bezier(.65,0,.35,1), width .9s cubic-bezier(.65,0,.35,1), height .9s cubic-bezier(.65,0,.35,1), border-color .9s ease}.s2[data-sub="2"] .device,.s2[data-sub="3"] .device,.s2[data-sub="4"] .device{left:64px;top:222px;width:1472px;height:622px;border-color:var(--rule)}
+.dev-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;transition:opacity .25s ease}
+.dev-label b{font-family:var(--mono);font-size:22px;font-weight:600}
+.dev-label span{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}.s2[data-sub="2"] .dev-label,.s2[data-sub="3"] .dev-label,.s2[data-sub="4"] .dev-label{opacity:0}
+.diagram{position:absolute;left:0;top:0;opacity:0;transition:opacity .3s ease}.s2[data-sub="2"] .diagram,.s2[data-sub="3"] .diagram{opacity:1;transition:opacity .5s ease .75s}
+
+.diagram .box{fill:var(--sheet);stroke:var(--ink);stroke-width:1.5}
+.diagram .arr{stroke:var(--ink);stroke-width:1.5}
+.diagram .fwd{stroke:var(--signal);stroke-width:2}
+.diagram .grad{fill:none;stroke:var(--grad);stroke-width:2.2}
+.diagram .stat{fill:none;stroke:var(--signal);stroke-width:1.6}
+.diagram .strike{stroke:var(--bad);stroke-width:2.5}
+.mk-ink{fill:var(--ink)} .mk-sig{fill:var(--signal)} .mk-grad{fill:var(--grad)}
+.t-title{font-family:var(--body);font-weight:600;font-size:17px;fill:var(--ink)}
+.t-sub{font-family:var(--body);font-size:14px;fill:var(--muted)}
+.t-mono{font-family:var(--mono);font-size:14px;fill:var(--ink)}
+.t-formula{font-family:var(--mono);font-size:20px;fill:var(--ink)}
+.t-cap{font-family:var(--mono);font-size:12px;letter-spacing:.12em;fill:var(--muted)}
+.sig-t{fill:var(--signal)} .bad-t{fill:var(--bad)}
+.lg-frz{fill:var(--grid);stroke:var(--rule);stroke-width:1.25}
+.lg-bn{fill:color-mix(in srgb, var(--signal) 16%, var(--sheet));stroke:var(--signal);stroke-width:2}
+.flow{stroke-dasharray:7 9;animation:flow 1s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-16}}
+.blk rect{fill:var(--sheet);stroke:var(--ink);stroke-width:1.25;transition:fill .5s ease, stroke .5s ease}
+.blk text{font-family:var(--mono);font-size:12px;fill:var(--ink);transition:fill .5s ease}.s2[data-sub="3"] .blk.frz rect,.s2[data-sub="4"] .blk.frz rect{fill:var(--grid);stroke:var(--rule)}.s2[data-sub="3"] .blk.frz text,.s2[data-sub="4"] .blk.frz text{fill:var(--muted)}.s2[data-sub="3"] .blk.bn rect,.s2[data-sub="4"] .blk.bn rect{fill:color-mix(in srgb, var(--signal) 16%, var(--sheet));stroke:var(--signal);stroke-width:2}.s2[data-sub="3"] .blk.bn text,.s2[data-sub="4"] .blk.bn text{fill:var(--signal);font-weight:600}
+.train-only{transition:opacity .45s ease}
+.tta-only{opacity:0;transition:opacity .45s ease}.s2[data-sub="3"] .train-only,.s2[data-sub="4"] .train-only{opacity:0}.s2[data-sub="3"] .tta-only,.s2[data-sub="4"] .tta-only{opacity:1;transition-delay:.15s}
+.lbl-grp{transition:opacity .45s ease}.s2[data-sub="3"] .lbl-grp,.s2[data-sub="4"] .lbl-grp{opacity:.35}
+
+/* Slide 3 */
+.heads3{position:absolute;left:64px;top:96px;width:1472px}
+.t3{position:absolute;left:0;top:0;margin:0;font-family:var(--display);font-stretch:116%;font-weight:700;font-size:42px;line-height:1.05;letter-spacing:-.01em;opacity:0;transform:translateY(8px);transition:opacity .35s ease, transform .35s ease;white-space:nowrap}
+.s3[data-sub="0"] .t3a,.s3[data-sub="1"] .t3b,.s3[data-sub="2"] .t3c,.s3[data-sub="3"] .t3c{opacity:1;transform:none;transition-delay:.2s}
+.honest{position:absolute;left:0;top:60px;margin:0;font-size:19px;line-height:1.45;color:var(--muted);max-width:none;white-space:nowrap;opacity:0;transform:translateY(6px);transition:opacity .4s ease, transform .4s ease}
+.s3[data-sub="3"] .honest{opacity:1;transform:none}
+.rangecv{position:absolute;left:64px;top:206px}
+.chart{position:absolute;top:442px;left:64px;width:1472px}
+.chart .readout{font-variant-numeric:tabular-nums}
+.chart .readout b{font-weight:600;transition:color .3s}
+.formula{position:absolute;left:64px;right:64px;top:782px;display:flex;justify-content:center;gap:56px;font-family:var(--mono);font-size:17px;color:var(--ink)}
+.formula sub{font-size:.7em}
+.ema{color:var(--signal);opacity:0;transition:opacity .4s ease}
+.s3[data-sub="2"] .ema,.s3[data-sub="3"] .ema{opacity:1}
+
+/* Slide 5 */
+.thanks{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding-bottom:40px}
+.thanks h2{margin:0;font-family:var(--display);font-stretch:120%;font-weight:740;font-size:96px;line-height:1.02;letter-spacing:-.02em;text-wrap:balance}
+.thanks .course{margin:44px 0 0;padding-top:28px;border-top:1px solid var(--rule);min-width:420px;font-family:var(--mono);font-size:16px;letter-spacing:.2em;color:var(--signal)}
+.thanks .who{margin:12px 0 0;font-size:28px;font-weight:500}
+
+/* Slide 4 */
+.heads4{position:absolute;left:64px;top:96px;width:1472px}
+.h4{position:absolute;left:0;top:0;opacity:0;transform:translateY(8px);transition:opacity .4s ease, transform .4s ease}
+.s4[data-sub="0"] .h4a,.s4[data-sub="1"] .h4b,.s4[data-sub="2"] .h4b{opacity:1;transform:none;transition-delay:.2s}
+.h4 h2{margin:0;font-family:var(--display);font-stretch:116%;font-weight:700;font-size:42px;line-height:1.05;letter-spacing:-.01em;white-space:nowrap}
+.h4b h2{color:var(--signal)}
+.cite4{margin:10px 0 0;font-family:var(--mono);font-size:13px;color:var(--muted)}
+.st4{position:absolute;left:64px;top:176px}
+.ch4{position:absolute;left:250px;top:616px}
+.take4{position:absolute;left:64px;top:826px;margin:0;font-size:19px;line-height:1.45;color:var(--ink);white-space:nowrap;opacity:0;transform:translateY(6px);transition:opacity .45s ease, transform .45s ease}
+.s4[data-sub="2"] .take4{opacity:1;transform:none}
+
+@media (prefers-reduced-motion: reduce){
+  .copy,.callout,.slide,.device,.hd,.fix,.t3,.honest,.ema,.h4,.take4{transition:none}
+  .ring{animation:none;opacity:.35;transform:scale(120)}
+  .r2{transform:scale(70);opacity:.5}.r3{transform:scale(170);opacity:.25}.r4{display:none}
+  .flow{animation:none}
+}
+</style>
+
+<div class="frame" id="frame">
+  <div class="wrap" id="wrap">
+    <div class="stage" id="stage">
+     <div class="slide s1" id="s1">
+
+      <section class="left">
+        <p class="eyebrow">Test-time adaptation · Slide 1 of 4</p>
+        <div class="copy" id="copy">
+          <h1 id="title">WiFi can read body pose</h1>
+          <p class="lede" id="lede"></p>
+        </div>
+        <div class="callout" id="callout" hidden>
+          <p>The model never changed. Its input distribution did, and in a real home there is no camera to label new data.</p>
+          <strong>Can the model adapt using only unlabeled CSI?</strong>
+        </div>
+        <ol class="steps" id="steps"></ol>
+      </section>
+
+      <section class="plan" aria-label="Room plan">
+        <div class="ph"><b>Room plan</b><span class="note">Each line is a signal path from TX to RX</span></div>
+        <canvas id="planCv" width="576" height="496" role="img" aria-label="Top-down plan of the room with transmitter, receiver, person, furniture and the signal paths between them. Click to change the environment."></canvas>
+      </section>
+
+      <section class="dash" aria-label="Pose model output">
+        <div class="dash-top"><span class="lbl-s">Pose model · live</span><span class="pill good" id="pill">In distribution</span></div>
+        <div>
+          <div class="big"><span id="pck">94</span><small>%</small></div>
+          <div class="lbl-s" style="margin-top:8px">Keypoint accuracy · PCK@0.5</div>
+          <div class="meter good" id="meterWrap"><i id="meter" style="width:94%"></i></div>
+        </div>
+        <div class="row"><span>Mean joint error</span><b><span id="mpjpe">84</span> mm</b></div>
+        <div>
+          <canvas id="poseCv" width="288" height="128" role="img" aria-label="Ground-truth skeleton compared with the model's predicted skeleton"></canvas>
+          <div class="legend" style="margin-top:6px"><span><i class="sw-gt"></i>Ground truth</span><span><i class="sw-pr"></i>Predicted</span></div>
+        </div>
+        <div>
+          <div class="lbl-s" style="margin-bottom:6px">PCK · last 30 s</div>
+          <canvas id="sparkCv" width="288" height="44" role="img" aria-label="Keypoint accuracy over the last 30 seconds"></canvas>
+        </div>
+      </section>
+
+      <section class="csi" aria-label="Channel state information">
+        <div class="ph">
+          <span><b>CSI amplitude</b> · by subcarrier, 80 MHz channel</span>
+          <span class="legend"><span><i class="sw-band"></i>Lab range (training)</span><span><i class="sw-pr"></i>Now</span><span><i class="sw-bad"></i>Outside lab range</span></span>
+        </div>
+        <canvas id="csiCv" width="1472" height="190" role="img" aria-label="CSI amplitude across subcarriers, compared with the range seen during training in the lab"></canvas>
+        <div class="readout" style="margin-top:2px"><b id="outPct">0%</b> of subcarriers outside the lab range</div>
+      </section>
+     </div>
+
+     <div class="slide s2 off" id="s2" data-sub="0" aria-hidden="true">
+      <p class="eyebrow s2-eyebrow">Test-time adaptation · Slide 2 of 4</p>
+      <div class="heads">
+        <div class="hd h-intro">
+          <h2 class="statement">After the product ships, the model no longer has access to labeled data.</h2>
+          <p class="fix">What’s the fix?</p>
+        </div>
+        <div class="hd h-train">
+          <h2>In the lab, labels drive every update</h2>
+        </div>
+        <div class="hd h-tta">
+          <h2>After shipping, the live data drives the update</h2>
+          <p>Test-time adaptation: recompute BatchNorm statistics on each live batch, then take a gradient step on γ and β with a loss that needs no labels.</p>
+        </div>
+      </div>
+
+      <svg class="scene" viewBox="0 0 1600 900" width="1600" height="900" aria-hidden="true">
+        <g transform="translate(800 636)">
+          <path class="ring r1" d="M -1 0 A 1 1 0 0 1 1 0"/>
+          <path class="ring r2" d="M -1 0 A 1 1 0 0 1 1 0"/>
+          <path class="ring r3" d="M -1 0 A 1 1 0 0 1 1 0"/>
+          <path class="ring r4" d="M -1 0 A 1 1 0 0 1 1 0"/>
+        </g>
+        <line class="ant" x1="726" y1="640" x2="726" y2="598"/><circle class="ant-tip" cx="726" cy="596" r="4"/>
+        <line class="ant" x1="874" y1="640" x2="874" y2="598"/><circle class="ant-tip" cx="874" cy="596" r="4"/>
+        <rect class="tbl" x="540" y="730" width="520" height="16"/>
+        <rect class="tbl" x="572" y="746" width="12" height="94"/>
+        <rect class="tbl" x="1016" y="746" width="12" height="94"/>
+        <line class="floor" x1="380" y1="840" x2="1220" y2="840"/>
+      </svg>
+
+      <div class="device" id="device">
+        <div class="dev-label"><b>TX</b><span>Pose model on device</span></div>
+        <svg class="diagram" viewBox="0 0 1472 620" width="1472" height="620" role="img" aria-label="Inside the device: CSI flows forward through the pose network to keypoints and a loss; gradients flow back. In test-time adaptation, the labels are gone, the loss is prediction entropy, and only the BatchNorm layers change.">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="mk-ink" d="M0 0 L10 5 L0 10 z"/></marker>
+            <marker id="ahs" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-sig" d="M0 0 L10 5 L0 10 z"/></marker>
+            <marker id="ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-grad" d="M0 0 L10 5 L0 10 z"/></marker>
+          </defs>
+
+          <text class="t-cap" x="736" y="46" text-anchor="middle">FORWARD</text>
+          <line class="fwd flow" x1="80" y1="62" x2="1392" y2="62" marker-end="url(#ahs)"/>
+
+          <!-- data -->
+          <path class="box" d="M40 200 V340 A105 24 0 0 0 250 340 V200"/>
+          <ellipse class="box" cx="145" cy="200" rx="105" ry="24"/>
+          <g class="train-only"><text class="t-title" x="145" y="272" text-anchor="middle">Lab CSI</text><text class="t-sub" x="145" y="296" text-anchor="middle">with camera labels</text></g>
+          <g class="tta-only"><text class="t-title" x="145" y="272" text-anchor="middle">Live CSI</text><text class="t-sub" x="145" y="296" text-anchor="middle">unlabeled stream</text></g>
+          <line class="arr" x1="256" y1="270" x2="326" y2="270" marker-end="url(#ah)"/>
+
+          <!-- model -->
+          <rect class="box" x="330" y="160" width="460" height="220" rx="4"/>
+          <text class="t-title" x="352" y="192">Pose net</text>
+          <text class="t-mono" x="768" y="192" text-anchor="end">ŷ = f(x; θ)</text>
+          <g class="blk frz"><rect x="354" y="210" width="52" height="124" rx="2"/><text x="380" y="276" text-anchor="middle">Conv</text></g>
+          <g class="blk bn"><rect x="414" y="210" width="52" height="124" rx="2"/><text x="440" y="276" text-anchor="middle">BN</text></g>
+          <g class="blk frz"><rect x="474" y="210" width="52" height="124" rx="2"/><text x="500" y="276" text-anchor="middle">ReLU</text></g>
+          <g class="blk frz"><rect x="534" y="210" width="52" height="124" rx="2"/><text x="560" y="276" text-anchor="middle">Conv</text></g>
+          <g class="blk bn"><rect x="594" y="210" width="52" height="124" rx="2"/><text x="620" y="276" text-anchor="middle">BN</text></g>
+          <g class="blk frz"><rect x="654" y="210" width="52" height="124" rx="2"/><text x="680" y="276" text-anchor="middle">ReLU</text></g>
+          <g class="blk frz"><rect x="714" y="210" width="52" height="124" rx="2"/><text x="740" y="276" text-anchor="middle">Head</text></g>
+          <line class="arr" x1="794" y1="270" x2="856" y2="270" marker-end="url(#ah)"/>
+
+          <!-- output -->
+          <rect class="box" x="860" y="190" width="200" height="160" rx="4"/>
+          <text class="t-title" x="880" y="220">Keypoints ŷ</text>
+          <text class="t-mono" x="880" y="254">head</text><text class="t-mono" x="1042" y="254" text-anchor="end">0.51 0.08</text>
+          <text class="t-mono" x="880" y="280">l. wrist</text><text class="t-mono" x="1042" y="280" text-anchor="end">0.24 0.41</text>
+          <text class="t-mono" x="880" y="306">r. ankle</text><text class="t-mono" x="1042" y="306" text-anchor="end">0.60 0.97</text>
+          <text class="t-sub" x="880" y="332">+ 14 more joints</text>
+          <line class="arr" x1="1064" y1="270" x2="1126" y2="270" marker-end="url(#ah)"/>
+
+          <!-- loss -->
+          <rect class="box" x="1130" y="190" width="270" height="160" rx="4"/>
+          <g class="train-only"><text class="t-title" x="1150" y="220">Loss</text><text class="t-formula" x="1150" y="266">‖ŷ − y‖²</text><text class="t-sub" x="1150" y="296">distance to the camera label</text></g>
+          <g class="tta-only"><text class="t-title" x="1150" y="220">Unsupervised loss</text><text class="t-formula" x="1150" y="266">H(p) = −Σ p log p</text><text class="t-sub" x="1150" y="296">entropy of each joint’s heatmap</text></g>
+
+          <!-- labels -->
+          <g class="lbl-grp">
+            <rect class="box" x="1175" y="430" width="180" height="54" rx="4"/>
+            <text class="t-title" x="1265" y="463" text-anchor="middle">Camera labels y</text>
+            <line class="arr" x1="1265" y1="428" x2="1265" y2="356" marker-end="url(#ah)"/>
+          </g>
+          <g class="tta-only">
+            <line class="strike" x1="1165" y1="492" x2="1365" y2="422"/>
+            <text class="t-sub bad-t" x="1265" y="512" text-anchor="middle">not available after shipping</text>
+          </g>
+
+          <!-- batch statistics (TTA) -->
+          <g class="tta-only">
+            <path class="stat flow" d="M145 176 C145 112, 440 112, 440 206" marker-end="url(#ahs)"/>
+            <path class="stat flow" d="M145 176 C145 96, 620 96, 620 206" marker-end="url(#ahs)"/>
+            <text class="t-sub sig-t" x="250" y="100">μ, σ² recomputed from each live batch</text>
+          </g>
+
+          <!-- backward -->
+          <path class="grad flow train-only" d="M1150 352 C1150 590, 620 600, 560 384" marker-end="url(#ahg)"/>
+          <g class="tta-only">
+            <path class="grad flow" d="M1150 352 C1150 600, 680 610, 620 340" marker-end="url(#ahg)"/>
+            <path class="grad flow" d="M1150 352 C1150 620, 500 630, 440 340" marker-end="url(#ahg)"/>
+          </g>
+          <text class="t-cap tta-only" x="800" y="604" text-anchor="middle">BACKWARD · GRADIENTS UPDATE BN γ, β ONLY</text>
+
+          <!-- layer legend -->
+          <g class="train-only">
+            <rect class="box" x="40" y="592" width="14" height="14" rx="2"/>
+            <text class="t-sub" x="62" y="604">every layer trainable</text>
+          </g>
+          <g class="tta-only">
+            <rect class="lg-frz" x="40" y="592" width="14" height="14" rx="2"/>
+            <text class="t-sub" x="62" y="604">frozen</text>
+            <rect class="lg-bn" x="126" y="592" width="14" height="14" rx="2"/>
+            <text class="t-sub" x="148" y="604">BN: γ, β adapt</text>
+          </g>
+        </svg>
+        <div class="tta-name" aria-hidden="true"><h3>Test-Time Adaptation</h3></div>
+      </div>
+     </div>
+
+     <div class="slide s3 off" id="s3" data-sub="0" aria-hidden="true">
+      <p class="eyebrow s2-eyebrow">Test-time adaptation · Slide 3 of 4</p>
+      <div class="heads3">
+        <h2 class="t3 t3a">Distance sets the signal’s scale</h2>
+        <h2 class="t3 t3b">Move the device, and every feature shifts</h2>
+        <h2 class="t3 t3c">BatchNorm re-centers them, batch by batch</h2>
+        <p class="honest">BN undoes a shift and a scale.</p>
+      </div>
+      <canvas id="rangeCv" class="rangecv" width="1472" height="210" role="img" aria-label="Transmitter and receiver on a distance scale; the received wave gets smaller as the transmitter moves away"></canvas>
+      <section class="chart" aria-label="CSI feature distribution with BatchNorm statistics">
+        <div class="ph"><span><b>CSI feature</b> · raw values with the BatchNorm window</span><span class="readout"><span id="statRead"></span> · <b id="netRead"></b></span></div>
+        <canvas id="bnCv" width="1472" height="310" role="img" aria-label="One axis showing the lab distribution, the current distribution, and the BatchNorm window that maps raw values to the network's input scale"></canvas>
+      </section>
+      <div class="formula"><span>x̂ = (x − μ) / σ</span><span class="ema">μ ← 0.9 μ + 0.1 μ<sub>batch</sub>&nbsp;&nbsp;&nbsp;σ² ← 0.9 σ² + 0.1 σ²<sub>batch</sub></span></div>
+     </div>
+
+     <div class="slide s4 off" id="s4" data-sub="0" aria-hidden="true">
+      <p class="eyebrow s2-eyebrow">Test-time adaptation · Slide 4 of 4</p>
+      <div class="heads4">
+        <div class="h4 h4a"><h2>BatchNorm was built for shifting weights</h2><p class="cite4">Ioffe &amp; Szegedy, 2015</p></div>
+        <div class="h4 h4b"><h2>TTA reuses it for shifting environments</h2><p class="cite4">Wang et al., 2021</p></div>
+      </div>
+      <canvas id="st4Cv" class="st4" width="1472" height="430" role="img" aria-label="A neural network whose weights change during training; its neurons then form a person's head and its connections the body, standing in a room whose layout keeps changing"></canvas>
+      <canvas id="ch4Cv" class="ch4" width="1100" height="190" role="img" aria-label="The input distribution of the BatchNorm layer and the BatchNorm window that follows it"></canvas>
+      <p class="take4">Internal covariate shift comes from updated weights; covariate shift comes from updated environments. BatchNorm handles both when its statistics are current.</p>
+     </div>
+
+     <div class="slide s5 off" id="s5" data-sub="0" aria-hidden="true">
+      <div class="thanks">
+        <h2>Thank you for your time</h2>
+        <p class="course">ICS 471</p>
+        <p class="who">Yazeed Alzahrani</p>
+      </div>
+     </div>
+
+      <div class="foot">
+        <span class="keys"><span><kbd>→</kbd>next change</span><span><kbd>←</kbd>back</span><button class="icon-btn" id="fsBtn" type="button"><kbd>F</kbd>full screen</button></span>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------- Scenes ---------- */
+const STAGES = [
+  { name:'Lab', tag:'Training data', title:'WiFi can read body pose',
+    lede:'',
+    W:8, H:6, tx:[0.9,3.0], rx:[7.1,3.0], gamma:0.55,
+    person:{x:4.1,y:3.55,r:0.24,s:1.0},
+    furn:[{id:'bench',label:'Bench',x0:2.2,y0:0.25,x1:5.8,y1:0.85,s:0.7}],
+    pck:94, mpjpe:84, err:0.012, collapse:0 },
+  { name:'New room', tag:'Environment', title:'Same person, different room',
+    lede:'',
+    W:6.6, H:5.0, tx:[0.6,2.5], rx:[6.0,2.5], gamma:0.5,
+    person:{x:3.3,y:2.9,r:0.24,s:1.0},
+    furn:[{id:'sofa',label:'Sofa',x0:0.9,y0:4.1,x1:3.3,y1:4.75,s:0.9},
+          {id:'table',label:'Table',x0:1.4,y0:2.95,x1:2.4,y1:3.55,s:0.8},
+          {id:'shelf',label:'Shelf',x0:5.2,y0:0.2,x1:6.4,y1:0.6,s:1.0},
+          {id:'chair',label:'Chair',x0:4.3,y0:0.9,x1:5.1,y1:1.7,s:0.7}],
+    pck:71, mpjpe:158, err:0.05, collapse:0.3 },
+  { name:'Routers moved', tag:'Device layout', title:'Same room, routers moved',
+    lede:'',
+    W:6.6, H:5.0, tx:[0.5,0.6], rx:[6.1,4.3], gamma:0.5,
+    person:{x:3.3,y:2.9,r:0.24,s:1.0},
+    furn:null, pck:49, mpjpe:242, err:0.09, collapse:0.55 },
+  { name:'New person', tag:'Subject', title:'Same setup, new person',
+    lede:'',
+    W:6.6, H:5.0, tx:[0.5,0.6], rx:[6.1,4.3], gamma:0.5,
+    person:{x:3.3,y:2.9,r:0.33,s:1.7},
+    furn:null, pck:33, mpjpe:319, err:0.14, collapse:0.75 }
+];
+STAGES[2].furn = STAGES[1].furn; STAGES[3].furn = STAGES[1].furn;
+const LAST = STAGES.length - 1;
+const UNION = ['bench','sofa','table','shelf','chair'];
+
+function findAny(id){ for (const s of STAGES){ const f = s.furn.find(x=>x.id===id); if (f) return f; } }
+function buildGeom(st){
+  const furn = {};
+  for (const id of UNION){
+    const own = st.furn.find(f=>f.id===id), src = own || findAny(id);
+    furn[id] = {x0:src.x0,y0:src.y0,x1:src.x1,y1:src.y1,s:src.s,label:src.label,a:own?1:0};
+  }
+  return {W:st.W,H:st.H,tx:st.tx.slice(),rx:st.rx.slice(),gamma:st.gamma,p:Object.assign({},st.person),furn};
+}
+const G = STAGES.map(buildGeom);
+const lerp = (a,b,t)=>a+(b-a)*t;
+function mix(a,b,t){
+  const furn = {};
+  for (const id of UNION){
+    const fa=a.furn[id], fb=b.furn[id];
+    furn[id] = {x0:lerp(fa.x0,fb.x0,t),y0:lerp(fa.y0,fb.y0,t),x1:lerp(fa.x1,fb.x1,t),y1:lerp(fa.y1,fb.y1,t),s:lerp(fa.s,fb.s,t),label:fb.label,a:lerp(fa.a,fb.a,t)};
+  }
+  return { W:lerp(a.W,b.W,t), H:lerp(a.H,b.H,t),
+    tx:[lerp(a.tx[0],b.tx[0],t),lerp(a.tx[1],b.tx[1],t)], rx:[lerp(a.rx[0],b.rx[0],t),lerp(a.rx[1],b.rx[1],t)],
+    gamma:lerp(a.gamma,b.gamma,t),
+    p:{x:lerp(a.p.x,b.p.x,t),y:lerp(a.p.y,b.p.y,t),r:lerp(a.p.r,b.p.r,t),s:lerp(a.p.s,b.p.s,t)}, furn };
+}
+const ease = t => t<.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2;
+
+/* ---------- Motion of the person (drives both the skeleton and the CSI) ---------- */
+const armL = t => 0.5-0.5*Math.cos(2*Math.PI*t/4.8);
+const armR = t => 0.5-0.5*Math.cos(2*Math.PI*(t-1.1)/4.8);
+function personAt(p, arm, swx, swy){
+  return {x:p.x + 0.004*swx + 0.006*arm, y:p.y + 0.003*swy, r:p.r, s:p.s*(1+0.18*arm)};
+}
+
+/* ---------- Ray model ---------- */
+const dist = (a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+function computePaths(g, P){
+  const tx=g.tx, rx=g.rx, out=[];
+  const dLos = dist(tx,rx);
+  out.push({pts:[tx,rx], len:dLos, amp:1/dLos, kind:'los', a:1});
+  const walls = [
+    {img:[-tx[0],tx[1]], ax:0, v:0}, {img:[2*g.W-tx[0],tx[1]], ax:0, v:g.W},
+    {img:[tx[0],-tx[1]], ax:1, v:0}, {img:[tx[0],2*g.H-tx[1]], ax:1, v:g.H}];
+  for (const w of walls){
+    const len = dist(w.img, rx);
+    const o = 1-w.ax, t = (w.v - w.img[w.ax])/(rx[w.ax]-w.img[w.ax]);
+    const p = [0,0]; p[w.ax] = w.v; p[o] = w.img[o] + t*(rx[o]-w.img[o]);
+    out.push({pts:[tx,p,rx], len, amp:g.gamma/len, kind:'wall', a:1});
+  }
+  // second-order wall reflections: used in the CSI sum, not drawn
+  const W2=2*g.W, H2=2*g.H, g2=g.gamma*g.gamma;
+  for (const im of [[W2+tx[0],tx[1]],[tx[0]-W2,tx[1]],[tx[0],H2+tx[1]],[tx[0],tx[1]-H2],
+                    [-tx[0],-tx[1]],[-tx[0],H2-tx[1]],[W2-tx[0],-tx[1]],[W2-tx[0],H2-tx[1]]]){
+    const len=dist(im,rx); out.push({pts:null, len, amp:g2/len, kind:'wall2', a:1});
+  }
+  const mid = [(tx[0]+rx[0])/2,(tx[1]+rx[1])/2];
+  for (const id of UNION){
+    const f = g.furn[id]; if (f.a < 0.01) continue;
+    const S = [Math.min(Math.max(mid[0],f.x0),f.x1), Math.min(Math.max(mid[1],f.y0),f.y1)];
+    const d1=dist(tx,S), d2=dist(S,rx);
+    out.push({pts:[tx,S,rx], len:d1+d2, amp:0.35*f.s*f.a/(d1*d2), kind:'obj', a:f.a});
+  }
+  const dx=mid[0]-P.x, dy=mid[1]-P.y, dn=Math.hypot(dx,dy)||1;
+  const S=[P.x+dx/dn*P.r, P.y+dy/dn*P.r];
+  const d1=dist(tx,S), d2=dist(S,rx);
+  out.push({pts:[tx,S,rx], len:d1+d2, amp:0.35*P.s/(d1*d2), kind:'person', a:1});
+  return out;
+}
+const C=299792458, FC=5.21e9, DF=312500;
+const K=[]; for(let k=-122;k<=122;k++){ if (k<=-2 || k>=2) K.push(k); }
+const N=K.length; // 242
+function csi(paths, out){
+  for (let i=0;i<N;i++){
+    const f = FC + K[i]*DF; let re=0, im=0;
+    for (const p of paths){ const ph = -2*Math.PI*f*p.len/C; re += p.amp*Math.cos(ph); im += p.amp*Math.sin(ph); }
+    out[i] = 20*Math.log10(Math.hypot(re,im)+1e-6);
+  }
+  return out;
+}
+
+/* Training (lab) range: lab CSI over the whole range of the person's motion */
+const lo = new Float64Array(N).fill(Infinity), hi = new Float64Array(N).fill(-Infinity);
+let yMin=Infinity, yMax=-Infinity;
+(function(){
+  const tmp = new Float64Array(N);
+  for (let a=0;a<=1.0001;a+=0.1) for (const sx of [-1,0,1]) for (const sy of [-1,0,1]){
+    csi(computePaths(G[0], personAt(G[0].p,a,sx,sy)), tmp);
+    for (let i=0;i<N;i++){ if(tmp[i]<lo[i])lo[i]=tmp[i]; if(tmp[i]>hi[i])hi[i]=tmp[i]; }
+  }
+  for (let i=0;i<N;i++){ lo[i]-=0.6; hi[i]+=0.6; }
+  for (const g of G) for (const a of [0,0.5,1]){
+    csi(computePaths(g, personAt(g.p,a,0,0)), tmp);
+    for (let i=0;i<N;i++){ yMin=Math.min(yMin,tmp[i],lo[i]); yMax=Math.max(yMax,tmp[i],hi[i]); }
+  }
+  yMax = Math.ceil((yMax+2)/5)*5;
+  yMin = Math.max(Math.floor((yMin-2)/5)*5, yMax-35);
+})();
+
+/* ---------- Canvas plumbing ---------- */
+const stageEl=document.getElementById('stage'), wrap=document.getElementById('wrap'), frame=document.getElementById('frame');
+const cvs = {plan:{el:document.getElementById('planCv'),w:576,h:496}, pose:{el:document.getElementById('poseCv'),w:288,h:128},
+  spark:{el:document.getElementById('sparkCv'),w:288,h:44}, csi:{el:document.getElementById('csiCv'),w:1472,h:190},
+  range:{el:document.getElementById('rangeCv'),w:1472,h:210}, bn:{el:document.getElementById('bnCv'),w:1472,h:310},
+  st4:{el:document.getElementById('st4Cv'),w:1472,h:430}, ch4:{el:document.getElementById('ch4Cv'),w:1100,h:190}};
+for (const k in cvs){ const c=cvs[k]; c.ctx=c.el.getContext('2d'); c.el.style.width=c.w+'px'; c.el.style.height=c.h+'px'; }
+let scale=1;
+function fit(){
+  const cs=getComputedStyle(frame);
+  const w=frame.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const h=frame.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  scale=Math.max(0.1,Math.min(w/1600,h/900));
+  wrap.style.width=(1600*scale)+'px'; wrap.style.height=(900*scale)+'px';
+  stageEl.style.transform='scale('+scale+')';
+  const r=Math.min(3,Math.max(1,(window.devicePixelRatio||1)*scale));
+  for (const k in cvs){ const c=cvs[k]; c.el.width=Math.round(c.w*r); c.el.height=Math.round(c.h*r); c.ctx.setTransform(r,0,0,r,0,0); }
+}
+addEventListener('resize',fit);
+document.addEventListener('fullscreenchange',fit);
+
+let TK={};
+function readTokens(){ const cs=getComputedStyle(document.documentElement); for (const n of ['paper','sheet','ink','muted','rule','grid','signal','good','warn','bad']) TK[n]=cs.getPropertyValue('--'+n).trim(); }
+readTokens();
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change',readTokens); } catch(e){}
+new MutationObserver(readTokens).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+const MONO='"IBM Plex Mono", ui-monospace, Menlo, monospace';
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- Room plan ---------- */
+function slash(c,x,y){ c.beginPath(); c.moveTo(x-4,y+4); c.lineTo(x+4,y-4); c.stroke(); }
+function drawPlan(g, P, paths, t){
+  const c=cvs.plan.ctx, W=576, H=496, k=62;
+  c.clearRect(0,0,W,H);
+  const rw=g.W*k, rh=g.H*k, ox=40+(520-rw)/2, oy=44+(408-rh)/2;
+  const X=x=>ox+x*k, Y=y=>oy+y*k;
+
+  // 1 m grid
+  c.strokeStyle=TK.grid; c.lineWidth=1; c.beginPath();
+  for (let x=1;x<g.W;x++){ c.moveTo(X(x)+.5,oy); c.lineTo(X(x)+.5,oy+rh); }
+  for (let y=1;y<g.H;y++){ c.moveTo(ox,Y(y)+.5); c.lineTo(ox+rw,Y(y)+.5); }
+  c.stroke();
+
+  // furniture
+  c.font='500 11px '+MONO; c.textAlign='center'; c.textBaseline='middle';
+  for (const id of UNION){
+    const f=g.furn[id]; if (f.a<0.01) continue;
+    c.globalAlpha=f.a;
+    c.fillStyle=TK.grid; c.fillRect(X(f.x0),Y(f.y0),(f.x1-f.x0)*k,(f.y1-f.y0)*k);
+    c.strokeStyle=TK.muted; c.lineWidth=1.25; c.strokeRect(X(f.x0),Y(f.y0),(f.x1-f.x0)*k,(f.y1-f.y0)*k);
+    c.fillStyle=TK.muted; c.fillText(f.label.toUpperCase(),X((f.x0+f.x1)/2),Y((f.y0+f.y1)/2));
+  }
+  c.globalAlpha=1;
+
+  // signal paths
+  const ampLos=paths[0].amp;
+  const off = reduced ? 0 : -((t*70)%16);
+  for (const p of paths){
+    if (!p.pts) continue;
+    const w=Math.min(1,p.amp/ampLos);
+    c.beginPath(); c.moveTo(X(p.pts[0][0]),Y(p.pts[0][1]));
+    for (let i=1;i<p.pts.length;i++) c.lineTo(X(p.pts[i][0]),Y(p.pts[i][1]));
+    c.strokeStyle=TK.signal; c.setLineDash([]); c.lineWidth=1;
+    c.globalAlpha=(0.12+0.18*w)*p.a; c.stroke();
+    c.setLineDash([5,11]); c.lineDashOffset=off; c.lineWidth=1.1+1.8*w;
+    c.globalAlpha=(0.35+0.55*w)*p.a; c.stroke();
+  }
+  c.setLineDash([]); c.globalAlpha=1;
+
+  // walls
+  c.strokeStyle=TK.ink; c.lineWidth=7; c.lineJoin='miter'; c.strokeRect(ox,oy,rw,rh);
+
+  // dimension lines
+  c.strokeStyle=TK.muted; c.fillStyle=TK.muted; c.lineWidth=1;
+  const dy=oy-22; c.beginPath(); c.moveTo(ox,dy); c.lineTo(ox+rw,dy); c.stroke(); slash(c,ox,dy); slash(c,ox+rw,dy);
+  const dx=ox-22; c.beginPath(); c.moveTo(dx,oy); c.lineTo(dx,oy+rh); c.stroke(); slash(c,dx,oy); slash(c,dx,oy+rh);
+  c.font='500 12px '+MONO; c.textAlign='center'; c.textBaseline='middle';
+  let s=g.W.toFixed(1)+' m', tw=c.measureText(s).width+12;
+  c.fillStyle=TK.paper; c.fillRect(ox+rw/2-tw/2,dy-8,tw,16); c.fillStyle=TK.muted; c.fillText(s,ox+rw/2,dy);
+  c.save(); c.translate(dx,oy+rh/2); c.rotate(-Math.PI/2);
+  s=g.H.toFixed(1)+' m'; tw=c.measureText(s).width+12;
+  c.fillStyle=TK.paper; c.fillRect(-tw/2,-8,tw,16); c.fillStyle=TK.muted; c.fillText(s,0,0); c.restore();
+
+  // person (plan view: shoulders and head)
+  const px=X(P.x), py=Y(P.y);
+  c.fillStyle=TK.ink; c.beginPath(); c.ellipse(px,py,P.r*k,P.r*0.55*k,0,0,Math.PI*2); c.fill();
+  c.fillStyle=TK.paper; c.strokeStyle=TK.ink; c.lineWidth=1.5; c.beginPath(); c.arc(px,py,0.1*k,0,Math.PI*2); c.fill(); c.stroke();
+  c.font='500 11px '+MONO; c.textAlign='left'; c.textBaseline='middle';
+  halo(c,'PERSON',px+P.r*k+8,py+P.r*0.55*k+8,TK.muted);
+
+  // devices
+  device(c,X(g.tx[0]),Y(g.tx[1]),true,'TX','access point',g.tx,g);
+  device(c,X(g.rx[0]),Y(g.rx[1]),false,'RX','CSI receiver',g.rx,g);
+
+  // title block and scale bar
+  c.font='600 12px '+MONO; c.fillStyle=TK.ink; c.textAlign='left'; c.textBaseline='alphabetic';
+  c.fillText('PLAN VIEW · '+STAGES[target].name.toUpperCase(),ox,H-14);
+  const sx=ox+rw-k, sy=H-20;
+  c.strokeStyle=TK.ink; c.lineWidth=1.5; c.beginPath(); c.moveTo(sx,sy); c.lineTo(sx+k,sy); c.moveTo(sx,sy-4); c.lineTo(sx,sy+4); c.moveTo(sx+k,sy-4); c.lineTo(sx+k,sy+4); c.stroke();
+  c.font='500 11px '+MONO; c.fillStyle=TK.muted; c.textAlign='right'; c.fillText('1 m',sx-8,sy+4);
+}
+function device(c,x,y,isTx,name,desc,pos,g){
+  c.lineWidth=2;
+  if (isTx){ c.fillStyle=TK.ink; c.fillRect(x-7,y-7,14,14); }
+  else { c.fillStyle=TK.paper; c.fillRect(x-7,y-7,14,14); c.strokeStyle=TK.ink; c.strokeRect(x-6,y-6,12,12); c.fillStyle=TK.ink; c.fillRect(x-2.5,y-2.5,5,5); }
+  const right = pos[0] > g.W/2, above = pos[1] > g.H/2 + 0.01;
+  const ax = right ? x-12 : x+12, ay = above ? y-30 : y+20;
+  c.textAlign = right ? 'right' : 'left'; c.textBaseline='middle';
+  c.font='600 12px '+MONO; halo(c,name,ax,ay,TK.ink);
+  c.font='500 11px '+MONO; halo(c,desc,ax,ay+14,TK.muted);
+}
+function halo(c,s,x,y,col){
+  c.lineJoin='round'; c.strokeStyle=TK.paper; c.lineWidth=5; c.strokeText(s,x,y);
+  c.fillStyle=col; c.fillText(s,x,y); c.lineJoin='miter';
+}
+
+/* ---------- CSI plot ---------- */
+function drawCSI(live, out){
+  const c=cvs.csi.ctx, W=1472, H=190, L=48, R=8, T=8, B=30, pw=W-L-R, ph=H-T-B;
+  c.clearRect(0,0,W,H);
+  const xk=k=>L+(k+122)/244*pw;
+  const ys=v=>T+(yMax-Math.min(yMax,Math.max(yMin,v)))/(yMax-yMin)*ph;
+  c.font='500 11px '+MONO; c.lineWidth=1;
+  c.textAlign='right'; c.textBaseline='middle';
+  for (let v=yMin; v<=yMax; v+=5){
+    const y=Math.round(ys(v))+.5; c.strokeStyle=TK.grid; c.beginPath(); c.moveTo(L,y); c.lineTo(L+pw,y); c.stroke();
+    c.fillStyle=TK.muted; c.fillText(v+' dB',L-8,y);
+  }
+  c.textAlign='center'; c.textBaseline='top';
+  for (const k of [-120,-60,0,60,120]){ const x=Math.round(xk(k))+.5; c.strokeStyle=TK.rule; c.beginPath(); c.moveTo(x,T+ph); c.lineTo(x,T+ph+5); c.stroke(); c.fillStyle=TK.muted; c.fillText(String(k),x,T+ph+9); }
+
+  // lab range band
+  c.beginPath(); c.moveTo(xk(K[0]),ys(hi[0]));
+  for (let i=1;i<N;i++) c.lineTo(xk(K[i]),ys(hi[i]));
+  for (let i=N-1;i>=0;i--) c.lineTo(xk(K[i]),ys(lo[i]));
+  c.closePath(); c.fillStyle=TK.signal; c.globalAlpha=0.13; c.fill();
+  c.globalAlpha=0.3; c.strokeStyle=TK.signal; c.stroke(); c.globalAlpha=1;
+
+  // live CSI
+  c.lineJoin='round'; c.lineWidth=2; c.strokeStyle=TK.signal; c.beginPath();
+  for (let i=0;i<N;i++){ const x=xk(K[i]), y=ys(live[i]); if(i===0)c.moveTo(x,y); else c.lineTo(x,y); }
+  c.stroke();
+  c.strokeStyle=TK.bad; c.lineWidth=2.6; c.beginPath();
+  for (let i=1;i<N;i++){ if (out[i]||out[i-1]){ c.moveTo(xk(K[i-1]),ys(live[i-1])); c.lineTo(xk(K[i]),ys(live[i])); } }
+  c.stroke();
+}
+
+/* ---------- Skeleton ---------- */
+const J=['head','neck','shL','shR','elL','elR','wrL','wrR','pel','hipL','hipR','knL','knR','anL','anR'];
+const BONES=[['head','neck'],['neck','shL'],['neck','shR'],['shL','elL'],['elL','wrL'],['shR','elR'],['elR','wrR'],['neck','pel'],['pel','hipL'],['pel','hipR'],['hipL','knL'],['knL','anL'],['hipR','knR'],['knR','anR']];
+function pose(aL,aR,t){
+  const p={head:[0,0.09],neck:[0,0.2],shL:[-0.12,0.22],shR:[0.12,0.22],pel:[0,0.52],hipL:[-0.07,0.53],hipR:[0.07,0.53]};
+  const arm=(sh,a,side)=>{ const th=0.22+2.0*a, be=0.35*a;
+    const e=[sh[0]+side*0.15*Math.sin(th), sh[1]+0.15*Math.cos(th)];
+    const w=[e[0]+side*0.14*Math.sin(th+be), e[1]+0.14*Math.cos(th+be)]; return [e,w]; };
+  [p.elL,p.wrL]=arm(p.shL,aL,-1); [p.elR,p.wrR]=arm(p.shR,aR,1);
+  const bend=0.02*Math.sin(2*Math.PI*t/4.8);
+  p.knL=[-0.08-bend,0.75]; p.knR=[0.08+bend,0.75]; p.anL=[-0.09,0.97]; p.anR=[0.09,0.97];
+  return p;
+}
+function drawPose(t, err, collapse){
+  const c=cvs.pose.ctx, W=288, H=128, s=118, cx=W/2, cy=4;
+  c.clearRect(0,0,W,H);
+  const gt=pose(armL(t),armR(t),t);
+  const pr=pose(lerp(armL(t),0.45,collapse),lerp(armR(t),0.45,collapse),t);
+  J.forEach((j,i)=>{
+    const nx=(Math.sin(1.7*t+i*1.9)+0.6*Math.sin(3.1*t+i*0.7))/1.6;
+    const ny=(Math.sin(1.3*t+i*2.3)+0.6*Math.sin(2.7*t+i*1.1))/1.6;
+    pr[j]=[pr[j][0]+err*nx+0.25*err, pr[j][1]+err*ny*0.8];
+  });
+  const P=q=>[cx+q[0]*s, cy+q[1]*s];
+  const drawSk=(p,col,lw,alpha,dots)=>{
+    c.globalAlpha=alpha; c.strokeStyle=col; c.lineWidth=lw; c.lineCap='round'; c.beginPath();
+    for (const [a,b] of BONES){ const A=P(p[a]),B=P(p[b]); c.moveTo(A[0],A[1]); c.lineTo(B[0],B[1]); }
+    c.stroke();
+    const h=P(p.head); c.beginPath(); c.arc(h[0],h[1],0.055*s,0,Math.PI*2); c.stroke();
+    if (dots){ c.fillStyle=col; for (const j of J){ if(j==='head')continue; const q=P(p[j]); c.beginPath(); c.arc(q[0],q[1],2.4,0,Math.PI*2); c.fill(); } }
+    c.globalAlpha=1;
+  };
+  drawSk(gt,TK.ink,3,0.28,false);
+  drawSk(pr,TK.signal,2.2,1,true);
+}
+
+/* ---------- Sparkline ---------- */
+const hist=new Array(300).fill(STAGES[0].pck);
+function drawSpark(){
+  const c=cvs.spark.ctx, W=288, H=44, n=hist.length;
+  c.clearRect(0,0,W,H);
+  const x=i=>i/(n-1)*(W-6), y=v=>3+(100-v)/100*(H-6);
+  c.strokeStyle=TK.grid; c.lineWidth=1; c.beginPath(); c.moveTo(0,y(50)+.5); c.lineTo(W,y(50)+.5); c.stroke();
+  c.beginPath(); c.moveTo(x(0),y(hist[0])); for (let i=1;i<n;i++) c.lineTo(x(i),y(hist[i]));
+  c.lineTo(x(n-1),H); c.lineTo(0,H); c.closePath(); c.fillStyle=TK.signal; c.globalAlpha=0.1; c.fill(); c.globalAlpha=1;
+  c.beginPath(); c.moveTo(x(0),y(hist[0])); for (let i=1;i<n;i++) c.lineTo(x(i),y(hist[i]));
+  c.strokeStyle=TK.signal; c.lineWidth=1.6; c.lineJoin='round'; c.stroke();
+  c.fillStyle=TK.signal; c.beginPath(); c.arc(x(n-1),y(hist[n-1]),3,0,Math.PI*2); c.fill();
+}
+
+/* ---------- Text and controls ---------- */
+const stepsEl=document.getElementById('steps');
+STAGES.forEach((st,i)=>{
+  const li=document.createElement('li');
+  li.innerHTML='<button type="button" data-i="'+i+'"><span class="n">'+(i+1)+'</span><span class="lbl">'+st.name+'</span><span class="tag">'+st.tag+'</span></button>';
+  stepsEl.appendChild(li);
+});
+stepsEl.addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setStep(+b.dataset.i); });
+const copyEl=document.getElementById('copy'), titleEl=document.getElementById('title'), ledeEl=document.getElementById('lede'), callout=document.getElementById('callout');
+let swapTimer=0;
+function setText(i, instant){
+  const apply=()=>{ titleEl.textContent=STAGES[i].title; ledeEl.innerHTML=STAGES[i].lede; copyEl.classList.remove('swap'); };
+  stepsEl.querySelectorAll('button').forEach((b,j)=>{ if(j===i) b.setAttribute('aria-current','step'); else b.removeAttribute('aria-current'); });
+  callout.hidden = i!==LAST;
+  clearTimeout(swapTimer);
+  if (instant || reduced) apply(); else { copyEl.classList.add('swap'); swapTimer=setTimeout(apply,200); }
+}
+
+let target=0, fromG=G[0], curG=G[0], tStart=-1e9;
+const DUR = reduced ? 1 : 1100;
+const disp={pck:STAGES[0].pck, mpjpe:STAGES[0].mpjpe, err:STAGES[0].err, collapse:0, out:0};
+function goStage(i){
+  i=Math.max(0,Math.min(LAST,i)); if (i===target) return;
+  fromG=curG; target=i; tStart=performance.now(); setText(i,false);
+}
+
+/* Deck: builds per slide 4, 4, 4, 3 */
+const s1=document.getElementById('s1'), s2=document.getElementById('s2'), s3=document.getElementById('s3'), s4=document.getElementById('s4');
+const s5=document.getElementById('s5');
+const SLIDES=[s1,s2,s3,s4,s5], COUNTS=[4,5,4,3,1];
+const STARTS=COUNTS.map((_,i)=>COUNTS.slice(0,i).reduce((a,b)=>a+b,0)), TOTAL=COUNTS.reduce((a,b)=>a+b,0);
+let step=0, s1HiddenAt=-1e9, s3HiddenAt=-1e9, s4HiddenAt=-1e9;
+const slideIdx = n => { for (let i=SLIDES.length-1;i>=0;i--) if (n>=STARTS[i]) return i; return 0; };
+function showSlides(n){
+  const si=slideIdx(n), sub=n-STARTS[si];
+  SLIDES.forEach((el,i)=>{
+    const on=i===si, was=!el.classList.contains('off');
+    el.classList.toggle('off',!on); el.setAttribute('aria-hidden',String(!on));
+    if (was && !on){ const now=performance.now(); if(i===0) s1HiddenAt=now; if(i===2) s3HiddenAt=now; if(i===3) s4HiddenAt=now; }
+  });
+  if (si>0) SLIDES[si].dataset.sub=String(sub);
+  if (si===2) s3Enter(sub);
+  if (si===3) s4Enter(sub);
+}
+function setStep(n){
+  n=Math.max(0,Math.min(TOTAL-1,n)); if (n===step) return;
+  step=n; showSlides(n);
+  if (n<=LAST) goStage(n);
+}
+document.getElementById('planCv').addEventListener('click',()=>setStep(step+1));
+function toggleFs(){
+  try{
+    if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+    else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(()=>{});
+  }catch(e){}
+}
+document.getElementById('fsBtn').addEventListener('click',toggleFs);
+addEventListener('keydown',e=>{
+  if (e.altKey||e.metaKey||e.ctrlKey) return;
+  const k=e.key, onBtn=e.target && e.target.tagName==='BUTTON';
+  if (k==='ArrowRight'||k==='PageDown'||k==='ArrowDown'||(k===' '&&!onBtn)||(k==='Enter'&&!onBtn)){ e.preventDefault(); setStep(step+1); }
+  else if (k==='ArrowLeft'||k==='PageUp'||k==='ArrowUp'||k==='Backspace'){ e.preventDefault(); setStep(step-1); }
+  else if (k==='Home'){ setStep(0); } else if (k==='End'){ setStep(TOTAL-1); }
+  else if (k==='f'||k==='F'){ toggleFs(); }
+});
+
+/* ---------- Slide 3: distance, shift and BN re-centering ---------- */
+const S3={sub:0, dist:2, distT:2, mu:10, v:4, muD:10, sigD:2, batch:0, adapting:false, nextAt:0};
+const NB=40;
+function mulberry(seed){ return function(){ seed|=0; seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+let rand=mulberry(7);
+function nrand(){ let u=0; while(!u) u=rand(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*rand()); }
+function resetStats(){ S3.mu=10; S3.v=4; S3.batch=0; S3.adapting=false; rand=mulberry(7); }
+function s3Enter(sub){
+  const prev=S3.sub; S3.sub=sub;
+  if (sub===0){ S3.distT=2; resetStats(); }
+  else if (sub===1){ S3.distT=4; resetStats(); }
+  else { S3.distT=4; if (S3.batch===0 && !S3.adapting){ S3.adapting=true; S3.nextAt=performance.now()+(prev===1?300:900); } }
+}
+function runBatch(){
+  const m=20/S3.dist, sd=4/S3.dist, n=32; let s=0, ss=0;
+  for (let i=0;i<n;i++){ const x=m+sd*nrand(); s+=x; ss+=x*x; }
+  const mb=s/n, vb=Math.max(0.05, ss/n-mb*mb);
+  S3.mu=0.9*S3.mu+0.1*mb; S3.v=0.9*S3.v+0.1*vb; S3.batch++;
+  if (S3.batch>=NB) S3.adapting=false;
+}
+const gpdf=(x,m,s)=>Math.exp(-0.5*((x-m)/s)**2)/(s*Math.sqrt(2*Math.PI));
+function curvePath(c,X,Y,m,s,x0,x1){
+  c.beginPath(); c.moveTo(X(x0),Y(0));
+  for (let i=0;i<=240;i++){ const x=x0+(x1-x0)*i/240; c.lineTo(X(x),Y(gpdf(x,m,s))); }
+  c.lineTo(X(x1),Y(0));
+}
+function axis(c,X,Y,x0,x1,stepv,W,L,R,fmt){
+  c.strokeStyle=TK.rule; c.lineWidth=1.5; c.beginPath(); c.moveTo(L,Y(0)+.5); c.lineTo(W-R,Y(0)+.5); c.stroke();
+  c.font='500 11px '+MONO; c.fillStyle=TK.muted; c.textAlign='center'; c.textBaseline='top'; c.lineWidth=1;
+  for (let x=x0; x<=x1+1e-9; x+=stepv){ c.beginPath(); c.moveTo(X(x)+.5,Y(0)); c.lineTo(X(x)+.5,Y(0)+5); c.stroke(); c.fillText(fmt(x),X(x),Y(0)+9); }
+}
+function lbl(c,s,x,y,col,align){ c.textAlign=align||'center'; c.textBaseline='alphabetic'; halo(c,s,x,y,col); }
+
+function drawRange(t){
+  const c=cvs.range.ctx, W=1472, H=210, RX=1200, PX=150, gy=168, X=d=>RX-d*PX;
+  c.clearRect(0,0,W,H);
+  c.strokeStyle=TK.rule; c.lineWidth=1.5; c.beginPath(); c.moveTo(X(6.4),gy); c.lineTo(RX+60,gy); c.stroke();
+  c.font='500 11px '+MONO; c.fillStyle=TK.muted; c.textBaseline='top'; c.lineWidth=1;
+  for (let d=0; d<=6; d++){ const x=X(d); c.beginPath(); c.moveTo(x,gy); c.lineTo(x,gy+6); c.stroke(); c.textAlign='center'; c.fillText(d+' m',x,gy+10); }
+  c.textAlign='right'; c.fillText('distance to receiver',X(6.4)-12,gy+10);
+  const tx=X(S3.dist), y0=88;
+  // wave: amplitude falls as 1/r from the transmitter
+  c.strokeStyle=TK.signal; c.lineWidth=2; c.lineJoin='round'; c.beginPath();
+  const ph=reduced?0:t*2*Math.PI*1.6;
+  for (let x=tx+34; x<=RX-34; x+=2){
+    const r=(x-tx)/PX, A=Math.min(44,72/Math.max(r,0.3));
+    const y=y0+A*Math.sin(2*Math.PI*(x-tx)/56-ph);
+    if (x===tx+34) c.moveTo(x,y); else c.lineTo(x,y);
+  }
+  c.stroke();
+  // devices
+  const dev=(x,isTx,name)=>{
+    c.strokeStyle=TK.ink; c.lineWidth=2.5; c.lineCap='round';
+    c.beginPath(); c.moveTo(x-16,gy-36); c.lineTo(x-16,gy-58); c.moveTo(x+16,gy-36); c.lineTo(x+16,gy-58); c.stroke();
+    c.fillStyle=TK.ink; c.beginPath(); c.arc(x-16,gy-60,3,0,Math.PI*2); c.arc(x+16,gy-60,3,0,Math.PI*2); c.fill();
+    if (isTx){ c.fillStyle=TK.ink; c.fillRect(x-30,gy-36,60,34); c.fillStyle=TK.paper; }
+    else { c.fillStyle=TK.sheet; c.fillRect(x-30,gy-36,60,34); c.lineWidth=2; c.strokeRect(x-29,gy-35,58,32); c.fillStyle=TK.ink; }
+    c.font='600 12px '+MONO; c.textAlign='center'; c.textBaseline='middle'; c.fillText(name,x,gy-19); c.lineCap='butt';
+  };
+  dev(tx,true,'TX'); dev(RX,false,'RX');
+  // dimension line
+  const dy=22; c.strokeStyle=TK.muted; c.lineWidth=1;
+  c.beginPath(); c.moveTo(tx,dy); c.lineTo(RX,dy); c.stroke(); slash(c,tx,dy); slash(c,RX,dy);
+  c.font='500 12px '+MONO; c.textAlign='center'; c.textBaseline='middle';
+  const ds=S3.dist.toFixed(1)+' m', tw=c.measureText(ds).width+12;
+  c.fillStyle=TK.paper; c.fillRect((tx+RX)/2-tw/2,dy-8,tw,16); c.fillStyle=TK.muted; c.fillText(ds,(tx+RX)/2,dy);
+  // received amplitude meter
+  const Arx=72/S3.dist, bx=RX+70, bh=Arx*2.6;
+  c.fillStyle=TK.grid; c.fillRect(bx,gy-2-44*2.6*0.95,16,44*2.6*0.95);
+  c.fillStyle=TK.signal; c.fillRect(bx,gy-2-bh,16,bh);
+  c.textAlign='left'; c.textBaseline='alphabetic';
+  c.font='500 11px '+MONO; c.fillStyle=TK.muted; c.fillText('RECEIVED AMPLITUDE',bx+28,gy-74);
+  c.font='600 26px '+MONO; c.fillStyle=TK.ink; c.fillText((2/S3.dist).toFixed(2)+'×',bx+28,gy-40);
+  c.font='500 12px '+MONO; c.fillStyle=TK.muted; c.fillText('∝ 1 / d',bx+28,gy-16);
+}
+function netState(){
+  const m=20/S3.dist, sd=4/S3.dist, mn=(m-S3.muD)/S3.sigD, sn=sd/S3.sigD;
+  const off=Math.abs(mn)+Math.abs(sn-1);
+  return {m, sd, mn, sn, cls: off<0.3?'good':off<1?'warn':'bad'};
+}
+const sgn=v=>(v<-0.005?'−':'')+Math.abs(v).toFixed(2);
+function drawBN(){
+  const c=cvs.bn.ctx, W=1472, H=310, L=132, R=40, T=46, base=206, x0=0, x1=16, ym=0.42;
+  const pw=W-L-R, X=x=>L+(x-x0)/(x1-x0)*pw, Y=y=>base-y/ym*(base-T);
+  const cx=x=>Math.max(L,Math.min(W-R,x));
+  c.clearRect(0,0,W,H);
+  const mu=S3.muD, sg=S3.sigD, ns=netState(), col=TK[ns.cls];
+
+  // BatchNorm window: mu ± 2 sigma (light) and mu ± sigma (darker)
+  c.fillStyle=TK.signal;
+  c.globalAlpha=0.06; c.fillRect(cx(X(mu-2*sg)),T-8,cx(X(mu+2*sg))-cx(X(mu-2*sg)),base-T+8);
+  c.globalAlpha=0.11; c.fillRect(cx(X(mu-sg)),T-8,cx(X(mu+sg))-cx(X(mu-sg)),base-T+8);
+  c.globalAlpha=1;
+  c.strokeStyle=TK.signal; c.lineWidth=1.5; c.setLineDash([4,4]);
+  c.beginPath(); c.moveTo(X(mu),base); c.lineTo(X(mu),T-8); c.stroke(); c.setLineDash([]);
+  c.font='600 12px '+MONO; lbl(c,'BN window: μ ± σ becomes −1 to 1 for the network',X(mu),T-18,TK.signal,'center');
+
+  // lab distribution (what training looked like)
+  curvePath(c,X,Y,10,2,x0,x1);
+  c.fillStyle=TK.muted; c.globalAlpha=0.08; c.fill(); c.globalAlpha=0.75;
+  c.strokeStyle=TK.muted; c.lineWidth=1.5; c.setLineDash([6,5]); c.stroke(); c.setLineDash([]); c.globalAlpha=1;
+  c.font='500 12px '+MONO; lbl(c,'lab (training)',X(13.2),Y(0.09),TK.muted,'left');
+
+  // current distribution
+  curvePath(c,X,Y,ns.m,ns.sd,x0,x1);
+  c.fillStyle=col; c.globalAlpha=0.14; c.fill(); c.globalAlpha=1;
+  c.strokeStyle=col; c.lineWidth=2.6; c.lineJoin='round'; c.stroke();
+  if (Math.abs(ns.m-10)>1.5){ c.font='600 13px '+MONO; lbl(c,'now',X(ns.m-ns.sd*1.3),Y(gpdf(ns.m,ns.m,ns.sd)*0.6),col,'right'); }
+
+  // raw axis
+  c.strokeStyle=TK.rule; c.lineWidth=1.5; c.beginPath(); c.moveTo(L,base+.5); c.lineTo(W-R,base+.5); c.stroke();
+  c.font='500 11px '+MONO; c.fillStyle=TK.muted; c.textAlign='center'; c.textBaseline='top'; c.lineWidth=1;
+  for (let x=x0; x<=x1; x++){ const px=X(x)+.5; c.beginPath(); c.moveTo(px,base); c.lineTo(px,base+(x%2?3:6)); c.stroke(); if (x%2===0) c.fillText(String(x),px,base+10); }
+  c.textAlign='right'; c.font='500 12px '+MONO; c.fillText('raw value x',L-26,base+9);
+
+  // BatchNorm ruler: where each normalized value x̂ = (x − μ)/σ sits on the raw axis
+  const ry=base+50;
+  c.strokeStyle=TK.signal; c.globalAlpha=0.35; c.lineWidth=1.5; c.beginPath(); c.moveTo(L,ry+.5); c.lineTo(W-R,ry+.5); c.stroke(); c.globalAlpha=1;
+  c.fillStyle=TK.signal; c.strokeStyle=TK.signal; c.textAlign='center'; c.textBaseline='top';
+  for (let k=-12; k<=12; k++){
+    const px=X(mu+k*sg); if (px<L-1 || px>W-R+1) continue;
+    c.lineWidth=k===0?2.5:1.5; c.beginPath(); c.moveTo(px,ry-6); c.lineTo(px,ry+6); c.stroke();
+    c.font=(k===0?'700 13px ':'500 12px ')+MONO; c.fillText(k<0?'−'+(-k):String(k),px,ry+10);
+  }
+  c.textAlign='right'; c.font='600 12px '+MONO; c.fillText('network sees x̂',L-26,ry+9);
+}
+const statRead=document.getElementById('statRead'), netRead=document.getElementById('netRead');
+function setTxt(el,s){ if (el.textContent!==s) el.textContent=s; }
+function slide3Frame(dt,t,now){
+  S3.dist += (S3.distT-S3.dist)*(reduced?1:1-Math.exp(-dt/0.32));
+  if (Math.abs(S3.distT-S3.dist)<0.002) S3.dist=S3.distT;
+  if (S3.adapting){
+    if (reduced){ while (S3.adapting) runBatch(); }
+    else while (S3.adapting && now>=S3.nextAt){ runBatch(); S3.nextAt+=130; }
+  }
+  const k=reduced?1:1-Math.exp(-dt/0.09);
+  S3.muD += (S3.mu-S3.muD)*k; S3.sigD += (Math.sqrt(S3.v)-S3.sigD)*k;
+  drawRange(t); drawBN();
+  const ns=netState();
+  setTxt(statRead, S3.sub<2 ? 'frozen lab stats: μ '+S3.muD.toFixed(1)+', σ '+S3.sigD.toFixed(1)
+                            : 'batch '+S3.batch+' / '+NB+': μ '+S3.muD.toFixed(2)+', σ '+S3.sigD.toFixed(2));
+  setTxt(netRead,'network sees mean '+sgn(ns.mn)+', std '+ns.sn.toFixed(2));
+  if (netRead.className!==ns.cls) netRead.className=ns.cls;
+}
+
+/* ---------- Slide 4: from shifting weights to shifting environments ---------- */
+const ENV4=[
+  {n:'Lab',          wl:330, wr:1142, txx:410,  txy:256, txPole:1, rxx:1030, rxy:318, rxPole:0, wf:1,    hs:1,    bench:1, sofa:0, plant:0, shelf:0, m:10,   s:2},
+  {n:'New room',     wl:420, wr:1072, txx:480,  txy:256, txPole:1, rxx:990,  rxy:256, rxPole:1, wf:1,    hs:1,    bench:0, sofa:1, plant:1, shelf:0, m:6,    s:1.4},
+  {n:'Routers moved',wl:420, wr:1072, txx:1010, txy:172, txPole:0, rxx:530,  rxy:328, rxPole:0, wf:1,    hs:1,    bench:0, sofa:1, plant:1, shelf:1, m:12.5, s:1.1},
+  {n:'New person',   wl:420, wr:1072, txx:1010, txy:172, txPole:0, rxx:530,  rxy:328, rxPole:0, wf:1.35, hs:1.12, bench:0, sofa:1, plant:1, shelf:1, m:7.5,  s:2.4}
+];
+const ENV_KEYS=Object.keys(ENV4[0]).filter(k=>k!=='n');
+const S4={sub:0, p:0, pT:0, q:0, trainStep:1200, env:0, cycling:false, envNext:0, envFrom:ENV4[0], envT0:-1e9, mu:10, v:4, batchAt:0};
+const rand4=mulberry(11);
+function n4(){ let u=0; while(!u) u=rand4(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*rand4()); }
+function envNow(now){
+  const k=Math.min(1,(now-S4.envT0)/900), e=ease(k), a=S4.envFrom, b=ENV4[S4.env];
+  if (k>=1) return b;
+  const o={n:b.n}; for (const key of ENV_KEYS) o[key]=lerp(a[key],b[key],e); return o;
+}
+function setEnv(i,now){ S4.envFrom=envNow(now); S4.env=i; S4.envT0=now; }
+function s4Enter(sub){
+  const now=performance.now(); S4.sub=sub;
+  if (sub===0){ S4.pT=0; S4.cycling=false; if (S4.env!==0) setEnv(0,now); }
+  else S4.pT=1;
+}
+
+/* network layout and the person it turns into */
+const CX4=736, NET=[], EDG=[];
+for (let l=0;l<4;l++) for (let i=0;i<4;i++) NET.push({x:CX4+(l-1.5)*150, y:95+i*80, l});
+for (let l=0;l<3;l++) for (let i=0;i<4;i++) for (let j=0;j<4;j++) EDG.push({a:l*4+i, b:(l+1)*4+j, k:l*16+i*4+j});
+function personSegs(wf,hs,t){
+  const X=dx=>CX4+dx*wf, sw=reduced?0:Math.sin(t*1.3)*6, neck=112+46*hs;
+  return [[X(0),neck,X(0),176],[X(0),176,X(0),290],[X(-46),190,X(46),190],
+    [X(-46),190,X(-72),252],[X(-72),252,X(-86)+sw,310],[X(46),190,X(72),252],[X(72),252,X(86)-sw,310],
+    [X(-26),290,X(26),290],[X(-26),290,X(-36),346],[X(-36),346,X(-42),400],[X(26),290,X(36),346],[X(36),346,X(42),400]];
+}
+const stag=(p,i,n)=>{ const d=0.4*i/(n-1); return ease(Math.max(0,Math.min(1,(p-d)/0.6))); };
+
+function drawRoom(c,E,Q,t){
+  const fl=400;
+  c.globalAlpha=Q;
+  c.strokeStyle=TK.ink; c.lineWidth=2; c.beginPath(); c.moveTo(250,fl); c.lineTo(1222,fl); c.stroke();
+  c.lineWidth=6; c.beginPath(); c.moveTo(E.wl,58); c.lineTo(E.wl,fl); c.moveTo(E.wr,58); c.lineTo(E.wr,fl); c.stroke();
+  c.strokeStyle=TK.rule; c.lineWidth=1.5; c.beginPath(); c.moveTo(E.wl,58); c.lineTo(E.wr,58); c.stroke();
+  const box=(x,y,w,h)=>{ c.fillStyle=TK.grid; c.fillRect(x,y,w,h); c.strokeStyle=TK.muted; c.lineWidth=1.5; c.strokeRect(x+.5,y+.5,w-1,h-1); };
+  if (E.bench>0.01){ c.globalAlpha=Q*E.bench; box(940,fl-70,180,10); box(952,fl-60,8,60); box(1100,fl-60,8,60); }
+  if (E.sofa>0.01){ c.globalAlpha=Q*E.sofa; box(440,fl-36,180,36); box(440,fl-64,180,28); box(428,fl-46,16,46); box(616,fl-46,16,46); }
+  if (E.plant>0.01){ c.globalAlpha=Q*E.plant; box(884,fl-34,40,34); c.beginPath(); c.arc(904,fl-62,26,0,Math.PI*2); c.fillStyle=TK.grid; c.fill(); c.strokeStyle=TK.muted; c.stroke(); }
+  if (E.shelf>0.01){ c.globalAlpha=Q*E.shelf; box(960,184,110,10); c.strokeStyle=TK.muted; c.beginPath(); c.moveTo(1066,194); c.lineTo(1066,214); c.lineTo(1046,194); c.stroke(); }
+  // signal paths through the person
+  const chest=[CX4,226];
+  c.globalAlpha=Q*0.75; c.strokeStyle=TK.signal; c.lineWidth=1.8; c.setLineDash([6,8]); c.lineDashOffset=reduced?0:-((t*60)%14);
+  c.beginPath(); c.moveTo(E.txx,E.txy); c.lineTo(chest[0],chest[1]); c.lineTo(E.rxx,E.rxy); c.stroke(); c.setLineDash([]);
+  // devices on poles or furniture
+  const dev=(x,y,pole,isTx)=>{
+    c.globalAlpha=Q*pole; c.strokeStyle=TK.muted; c.lineWidth=3; c.beginPath(); c.moveTo(x,y+11); c.lineTo(x,fl); c.stroke();
+    c.globalAlpha=Q; c.strokeStyle=TK.ink; c.lineWidth=2.2; c.lineCap='round';
+    c.beginPath(); c.moveTo(x-12,y-11); c.lineTo(x-12,y-26); c.moveTo(x+12,y-11); c.lineTo(x+12,y-26); c.stroke(); c.lineCap='butt';
+    if (isTx){ c.fillStyle=TK.ink; c.fillRect(x-24,y-11,48,22); c.fillStyle=TK.paper; }
+    else { c.fillStyle=TK.sheet; c.fillRect(x-24,y-11,48,22); c.lineWidth=2; c.strokeRect(x-23,y-10,46,20); c.fillStyle=TK.ink; }
+    c.font='600 11px '+MONO; c.textAlign='center'; c.textBaseline='middle'; c.fillText(isTx?'TX':'RX',x,y+1);
+  };
+  dev(E.txx,E.txy,E.txPole,true); dev(E.rxx,E.rxy,E.rxPole,false);
+  // environment name
+  c.globalAlpha=Q; c.font='500 12px '+MONO; c.textAlign='left'; c.textBaseline='alphabetic'; c.fillStyle=TK.muted;
+  c.fillText('ENVIRONMENT',250,26); c.font='600 15px '+MONO; c.fillStyle=TK.signal; c.fillText(E.n,250,46);
+  c.globalAlpha=1;
+}
+function drawStage4(t,now){
+  const c=cvs.st4.ctx, W=1472, H=430; c.clearRect(0,0,W,H);
+  const E=envNow(now), P=S4.p, Q=S4.q;
+  if (Q>0.01) drawRoom(c,E,Q,t);
+  const segs=personSegs(E.wf,E.hs,t), hr=46*E.hs;
+  // connections: flicker as weights during training, then become the body
+  EDG.forEach((e,idx)=>{
+    const pe=stag(P,idx%24,24), sg=segs[idx%12];
+    const A=NET[e.a], B=NET[e.b];
+    const x1=lerp(A.x,sg[0],pe), y1=lerp(A.y,sg[1],pe), x2=lerp(B.x,sg[2],pe), y2=lerp(B.y,sg[3],pe);
+    const w=reduced?0.5:0.5+0.5*Math.sin(t*(1.3+0.37*(e.k%5))+e.k*0.9);
+    c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2);
+    if (pe<1){ c.strokeStyle=TK.grad; c.globalAlpha=(1-pe)*(0.15+0.65*w); c.lineWidth=0.8+1.8*w; c.stroke(); }
+    if (pe>0){ c.strokeStyle=TK.ink; c.globalAlpha=pe*0.55; c.lineWidth=lerp(1,4,pe); c.lineCap='round'; c.stroke(); c.lineCap='butt'; }
+  });
+  c.globalAlpha=1;
+  // neurons: one grows into the head, the rest fade away
+  const HEAD=9;
+  NET.forEach((n,k)=>{
+    if (k===HEAD) return;
+    const pe=ease(Math.max(0,Math.min(1,P/0.5))), r=10*(1-pe);
+    if (r<0.3) return;
+    c.globalAlpha=1-pe; c.beginPath(); c.arc(n.x,n.y,r,0,Math.PI*2); c.fillStyle=TK.sheet; c.fill();
+    const bn=n.l===2; c.lineWidth=bn?2.6:1.6; c.strokeStyle=bn?TK.signal:TK.ink; c.stroke();
+  });
+  c.globalAlpha=1;
+  {
+    const n=NET[HEAD], pe=ease(P), x=lerp(n.x,CX4,pe), y=lerp(n.y,112,pe), r=lerp(10,hr,pe);
+    c.beginPath(); c.arc(x,y,r,0,Math.PI*2); c.fillStyle=TK.sheet; c.fill();
+    c.lineWidth=lerp(2.6,3,pe); c.strokeStyle=pe<0.5?TK.signal:TK.ink; c.stroke();
+  }
+  // training captions fade out as the person forms
+  if (P<0.99){
+    c.globalAlpha=1-Math.min(1,P*2);
+    c.font='600 11px '+MONO; c.fillStyle=TK.signal; c.textAlign='center'; c.textBaseline='alphabetic'; c.fillText('BN LAYER',CX4+0.5*150,370);
+    c.textAlign='left'; c.font='600 15px '+MONO; c.fillStyle=TK.ink; c.fillText('Weights update every step',1080,170);
+    c.font='500 13px '+MONO; c.fillStyle=TK.muted;
+    c.fillText('training step '+Math.floor(S4.trainStep).toLocaleString('en-US'),1080,198);
+    c.fillText('so the BN layer’s input keeps moving',1080,222);
+    c.globalAlpha=1;
+  }
+}
+function drawChart4(m,s,mu,sg,cls,leftTxt,rightTxt){
+  const c=cvs.ch4.ctx, W=1100, H=190, L=16, R=16, T=40, base=156, x0=0, x1=16, ym=0.42;
+  const X=x=>L+(x-x0)/(x1-x0)*(W-L-R), Y=y=>base-y/ym*(base-T), cx=x=>Math.max(L,Math.min(W-R,x));
+  c.clearRect(0,0,W,H);
+  c.fillStyle=TK.signal;
+  c.globalAlpha=0.06; c.fillRect(cx(X(mu-2*sg)),T-6,cx(X(mu+2*sg))-cx(X(mu-2*sg)),base-T+6);
+  c.globalAlpha=0.11; c.fillRect(cx(X(mu-sg)),T-6,cx(X(mu+sg))-cx(X(mu-sg)),base-T+6); c.globalAlpha=1;
+  c.strokeStyle=TK.signal; c.lineWidth=1.5; c.setLineDash([4,4]); c.beginPath(); c.moveTo(X(mu),base); c.lineTo(X(mu),T-6); c.stroke(); c.setLineDash([]);
+  const col=TK[cls];
+  curvePath(c,X,Y,m,s,x0,x1); c.fillStyle=col; c.globalAlpha=0.14; c.fill(); c.globalAlpha=1;
+  c.strokeStyle=col; c.lineWidth=2.5; c.lineJoin='round'; c.stroke();
+  c.strokeStyle=TK.rule; c.lineWidth=1.5; c.beginPath(); c.moveTo(L,base+.5); c.lineTo(W-R,base+.5); c.stroke();
+  c.font='500 11px '+MONO; c.fillStyle=TK.muted; c.textAlign='center'; c.textBaseline='top'; c.lineWidth=1;
+  for (let x=x0;x<=x1;x+=2){ c.beginPath(); c.moveTo(X(x)+.5,base); c.lineTo(X(x)+.5,base+5); c.stroke(); c.fillText(String(x),X(x),base+9); }
+  c.textBaseline='alphabetic'; c.font='600 13px '+MONO;
+  c.textAlign='left'; c.fillStyle=TK.signal; c.fillText(leftTxt,L,18);
+  c.textAlign='right'; c.fillStyle=col; c.fillText(rightTxt,W-R,18);
+}
+function slide4Frame(dt,t,now){
+  // morph progress and room fade
+  if (reduced) S4.p=S4.pT; else S4.p=Math.max(0,Math.min(1,S4.p+Math.sign(S4.pT-S4.p)*dt/1.8));
+  const qT = S4.sub>=1 && S4.p>0.85 ? 1 : 0;
+  S4.q += (qT-S4.q)*(reduced?1:1-Math.exp(-dt/0.3));
+  S4.trainStep += dt*180;
+  if (S4.sub>=1 && S4.p>=1 && !S4.cycling){ S4.cycling=true; S4.envNext=now+2600; S4.batchAt=now; }
+  if (S4.cycling && now>=S4.envNext){ setEnv((S4.env+1)%ENV4.length,now); S4.envNext=now+3600; }
+
+  let m,s,mu,sg,cls,lt,rt;
+  if (S4.sub===0 || !S4.cycling){
+    m=8.5+2.2*Math.sin(0.8*t)+0.9*Math.sin(2.1*t+1); s=1.6+0.45*Math.sin(1.2*t);
+    mu=m; sg=s; cls='good'; lt='BN window = this batch’s μ ± σ'; rt='always aligned';
+    S4.mu=m; S4.v=s*s;
+  } else {
+    const E=ENV4[S4.env]; m=E.m; s=E.s;
+    if (now-S4.batchAt>2000) S4.batchAt=now;
+    if (reduced){ S4.mu=m; S4.v=s*s; }
+    else while (now>=S4.batchAt){
+      let a=0, b=0; for (let i=0;i<32;i++){ const x=m+s*n4(); a+=x; b+=x*x; }
+      const mb=a/32, vb=Math.max(0.05,b/32-mb*mb);
+      S4.mu=0.9*S4.mu+0.1*mb; S4.v=0.9*S4.v+0.1*vb; S4.batchAt+=110;
+    }
+    mu=S4.mu; sg=Math.sqrt(S4.v);
+    const off=Math.abs(m-mu)/sg+Math.abs(s/sg-1); cls=off<0.3?'good':off<1?'warn':'bad';
+    lt='BN window = running μ ± σ, refreshed from live data';
+    rt= cls==='good' ? 'caught up' : 'network sees mean '+sgn((m-mu)/sg);
+  }
+  drawStage4(t,now);
+  drawChart4(m,s,mu,sg,cls,lt,rt);
+}
+
+/* ---------- Loop ---------- */
+const pckEl=document.getElementById('pck'), mpEl=document.getElementById('mpjpe'), meter=document.getElementById('meter'), meterWrap=document.getElementById('meterWrap'), pill=document.getElementById('pill'), outEl=document.getElementById('outPct');
+const live=new Float64Array(N), outside=new Uint8Array(N);
+let last=performance.now(), lastSample=0, shown={pck:-1,mp:-1,out:-1,cls:''};
+function frameLoop(now){
+  const dt=Math.min(0.1,(now-last)/1000); last=now; const t=now/1000;
+  if (step<=LAST || now-s1HiddenAt<900) slide1Frame(dt,t,now);
+  if (slideIdx(step)===2 || now-s3HiddenAt<900) slide3Frame(dt,t,now);
+  if (slideIdx(step)===3 || now-s4HiddenAt<900) slide4Frame(dt,t,now);
+  requestAnimationFrame(frameLoop);
+}
+function slide1Frame(dt,t,now){
+  const p=ease(Math.min(1,Math.max(0,(now-tStart)/DUR)));
+  curG = p>=1 ? G[target] : mix(fromG,G[target],p);
+
+  const P=personAt(curG.p,(armL(t)+armR(t))/2,Math.sin(2*Math.PI*t/2.3),Math.sin(2*Math.PI*t/3.1));
+  const paths=computePaths(curG,P);
+  csi(paths,live);
+  let n=0;
+  for (let i=0;i<N;i++){ live[i]+=0.3*Math.sin(1.7*t+i*0.11)*Math.sin(0.9*t+i*0.05); outside[i]=(live[i]>hi[i]||live[i]<lo[i])?1:0; n+=outside[i]; }
+
+  const T=STAGES[target], kf=1-Math.exp(-dt/0.55);
+  disp.pck+=(T.pck-disp.pck)*kf; disp.mpjpe+=(T.mpjpe-disp.mpjpe)*kf;
+  disp.err+=(T.err-disp.err)*kf; disp.collapse+=(T.collapse-disp.collapse)*kf;
+  disp.out+=(n/N*100-disp.out)*(1-Math.exp(-dt/0.4));
+  const pckNow=Math.max(0,Math.min(100,disp.pck+0.7*Math.sin(0.9*t)+0.4*Math.sin(2.3*t)));
+  const mpNow=disp.mpjpe+2.5*Math.sin(1.1*t+1);
+
+  if (now-lastSample>100){ hist.push(pckNow); hist.shift(); lastSample=now; }
+
+  const rp=Math.round(pckNow), rm=Math.round(mpNow), ro=Math.round(disp.out);
+  if (rp!==shown.pck){ pckEl.textContent=rp; meter.style.width=rp+'%'; shown.pck=rp; }
+  if (rm!==shown.mp){ mpEl.textContent=rm; shown.mp=rm; }
+  if (ro!==shown.out){ outEl.textContent=ro+'%'; shown.out=ro; }
+  const cls = pckNow>=85?'good':pckNow>=55?'warn':'bad';
+  if (cls!==shown.cls){
+    pill.className='pill '+cls; meterWrap.className='meter '+cls;
+    pill.textContent = cls==='good'?'In distribution':cls==='warn'?'Shifted':'Severe shift';
+    shown.cls=cls;
+  }
+
+  drawPlan(curG,P,paths,t);
+  drawCSI(live,outside);
+  drawPose(t,disp.err,disp.collapse);
+  drawSpark();
+}
+
+function start(data){
+  const n = data && Number.isInteger(data.step) ? Math.max(0,Math.min(TOTAL-1,data.step)) : 0;
+  const s = Math.min(n,LAST);
+  step=n; if (n>LAST){ showSlides(n); s1HiddenAt=-1e9; }
+  target=s; curG=G[s]; fromG=G[s];
+  const T=STAGES[s]; disp.pck=T.pck; disp.mpjpe=T.mpjpe; disp.err=T.err; disp.collapse=T.collapse;
+  hist.fill(T.pck);
+  setText(s,true); fit(); requestAnimationFrame(frameLoop);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+}
+try { window.claude?.hot?.snapshot?.(()=>({step})); } catch(e){}
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
+
+</body></html>
